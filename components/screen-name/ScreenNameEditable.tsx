@@ -4,21 +4,47 @@ import { useCallback, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { createClient } from "@/utils/supabase/client";
-import { redirect } from "next/navigation";
 import { EditIcon } from "lucide-react";
 import { useUserData } from "@/hooks/user-data/useUserData";
+import { useRefreshUserData } from "@/hooks/user-data/useRefreshUserData";
+import { useUI } from "@/app/recoil/hooks/useUI";
+import { useGT } from "gt-react";
 
-export const ScreenNameEditable = ({ userId }: { userId: string }) => {
+interface ScreenNameEditableProps {
+  userId: string;
+  /** Stay on the current page after saving (Preferences unlocks its gate here). */
+  stayOnPage?: boolean;
+}
+
+export const ScreenNameEditable = ({ userId, stayOnPage = false }: ScreenNameEditableProps) => {
   const { data: userData } = useUserData(userId);
+  const refreshUserData = useRefreshUserData();
+  const { showErrorToast } = useUI();
+  const gt = useGT();
 
   const [isEditing, setIsEditing] = useState(false);
   const [screenNameValue, setScreenNameValue] = useState('');
 
   const upsertScreenName = useCallback(async () => {
     const supabase = createClient();
-    await supabase.from('user data').upsert({ id: userId, live_screen_name: screenNameValue });
-    window.location.href = '/home';
-  }, [screenNameValue]);
+    const { error } = await supabase
+      .from('user data')
+      .upsert({ id: userId, live_screen_name: screenNameValue });
+
+    if (error) {
+      showErrorToast(
+        gt('Could not save your screen name. Try again.', {
+          $id: 'preferences.screenName.toast.saveFailed',
+        })
+      );
+      return;
+    }
+
+    await refreshUserData(userId);
+    setIsEditing(false);
+
+    if (!stayOnPage) window.location.href = '/home';
+  }, [screenNameValue, userId, refreshUserData, showErrorToast, gt, stayOnPage]);
 
   if (isEditing || !userData?.live_screen_name) {
     return (

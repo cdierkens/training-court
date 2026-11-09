@@ -192,5 +192,7 @@ Training Court deck ids.
   `201`/`200`/`401`/`422`/`429`/`500`.
 - Credential lifecycle tests with the admin client mocked: validation, cap,
   revoke, list-unavailable, rotate.
-- Manual: mint a token on a preview deployment, configure the tracker against
-  it, and confirm a duplicate retry produces one row.
+- Manual: mint a token, configure the tracker against production (the copied
+  config always names `https://www.trainingcourt.app`), and confirm a duplicate
+  retry produces one row. For a preview build, point the destination URL at
+  that host by hand.
