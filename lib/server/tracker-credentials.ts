@@ -6,7 +6,26 @@ import {
 } from '@/lib/tracker-sync/limits';
 import { createAdminClient } from '@/utils/supabase/admin';
 
+
 const MAX_LABEL_LENGTH = 64;
+
+type TrackerCredentialRow = {
+  id: string;
+  label: string;
+  default_format: string;
+  token_hint: string;
+  created_at: string;
+  last_used_at: string | null;
+};
+
+export type TrackerCredentialSummary = {
+  id: string;
+  label: string;
+  defaultFormat: string;
+  tokenHint: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+};
 
 export type TrackerCredentialClaim =
   | {
@@ -35,11 +54,53 @@ type MintResult =
   | { ok: true; token: string }
   | TrackerCredentialFailure;
 
+export type TrackerCredentialsResult =
+  | { ok: true; credentials: TrackerCredentialSummary[] }
+  | { ok: false };
+
+const toSummary = (row: TrackerCredentialRow): TrackerCredentialSummary => ({
+  id: row.id,
+  label: row.label,
+  defaultFormat: row.default_format,
+  tokenHint: row.token_hint,
+  createdAt: row.created_at,
+  lastUsedAt: row.last_used_at,
+});
+
 const validLabel = (label: string) => {
   const trimmed = label.trim();
   if (trimmed.length === 0 || trimmed.length > MAX_LABEL_LENGTH) return null;
   return trimmed;
 };
+
+export async function listTrackerCredentials(
+  userId: string
+): Promise<TrackerCredentialsResult> {
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase
+      .from('tracker_credentials')
+      .select('id, label, default_format, token_hint, created_at, last_used_at')
+      .eq('user_id', userId)
+      .is('revoked_at', null)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      // An unapplied migration or missing grant must not read as "no tokens".
+      console.error('Could not list tracker credentials:', error.message);
+      return { ok: false };
+    }
+
+    return {
+      ok: true,
+      credentials: ((data ?? []) as TrackerCredentialRow[]).map(toSummary),
+    };
+  } catch (error) {
+    // A missing service-role key throws here; Preferences must still render.
+    console.error('Could not read tracker credentials:', error);
+    return { ok: false };
+  }
+}
 
 export async function mintTrackerCredential(input: {
   userId: string;
@@ -66,7 +127,8 @@ export async function mintTrackerCredential(input: {
 
   if (error) {
     console.error('Could not create tracker credential:', error.message);
-    return `${error.message}`.includes('tracker_credential_limit')
+    const capped = `${error?.message ?? ''}`.includes('tracker_credential_limit');
+    return capped
       ? {
           ok: false,
           code: 'limit_reached',
@@ -76,6 +138,140 @@ export async function mintTrackerCredential(input: {
   }
 
   return { ok: true, token: minted.token };
+}
+
+/**
+ * Issues a replacement token. A row is one issued token, so this creates a new
+ * row with the same label and format and revokes the old one; logs keep
+ * pointing at the row that actually delivered them.
+ */
+export async function rotateTrackerCredential(input: {
+  userId: string;
+  credentialId: string;
+}): Promise<MintResult> {
+  const supabase = createAdminClient();
+  const { data: previous, error: readError } = await supabase
+    .from('tracker_credentials')
+    .select('id, label, default_format')
+    .eq('id', input.credentialId)
+    .eq('user_id', input.userId)
+    .is('revoked_at', null)
+    .maybeSingle();
+
+  if (readError) {
+    console.error('Could not read tracker credential:', readError.message);
+    return { ok: false, code: 'unavailable', message: 'Could not replace the token. Try again.' };
+  }
+
+  if (!previous) {
+    return { ok: false, code: 'not_found', message: 'That token is no longer active.' };
+  }
+
+  // Revoke before inserting so the database cap counts the freed slot. The
+  // timestamp scopes the rollback to this attempt.
+  const revokedAt = new Date().toISOString();
+  const { data: revoked, error: revokeError } = await supabase
+    .from('tracker_credentials')
+    .update({ revoked_at: revokedAt })
+    .eq('id', input.credentialId)
+    .eq('user_id', input.userId)
+    .is('revoked_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (revokeError) {
+    console.error('Could not revoke the replaced token:', revokeError.message);
+    return { ok: false, code: 'unavailable', message: 'Could not replace the token. Try again.' };
+  }
+
+  if (!revoked) {
+    return { ok: false, code: 'not_found', message: 'That token is no longer active.' };
+  }
+
+  const minted = mintTrackerToken();
+  const { error } = await supabase.from('tracker_credentials').insert({
+    user_id: input.userId,
+    label: previous.label,
+    default_format: previous.default_format,
+    token_hash: minted.hash,
+    token_hint: minted.hint,
+  });
+
+  if (error) {
+    console.error('Could not replace the token:', error.message);
+    await supabase
+      .from('tracker_credentials')
+      .update({ revoked_at: null })
+      .eq('id', input.credentialId)
+      .eq('user_id', input.userId)
+      .eq('revoked_at', revokedAt);
+    return { ok: false, code: 'unavailable', message: 'Could not replace the token. Try again.' };
+  }
+
+  return { ok: true, token: minted.token };
+}
+
+/**
+ * Changes the format new deliveries fall back to. Kept separate from rotating
+ * because the default matters most when Send deck identity is off: it stamps
+ * every log the tracker sends.
+ */
+export async function updateTrackerCredentialFormat(input: {
+  userId: string;
+  credentialId: string;
+  defaultFormat: string;
+}): Promise<{ ok: true } | TrackerCredentialFailure> {
+  if (!isLogFormat(input.defaultFormat)) {
+    return { ok: false, code: 'invalid_format', message: 'Choose a format for this token.' };
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('tracker_credentials')
+    .update({ default_format: input.defaultFormat })
+    .eq('id', input.credentialId)
+    .eq('user_id', input.userId)
+    .is('revoked_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    console.error('Could not update tracker credential format:', error.message);
+    return { ok: false, code: 'unavailable', message: 'Could not update the format. Try again.' };
+  }
+
+  if (!data) {
+    return { ok: false, code: 'not_found', message: 'That token is no longer active.' };
+  }
+
+  return { ok: true };
+}
+
+/** Revoked rows are kept so provenance on old logs survives. */
+export async function revokeTrackerCredential(input: {
+  userId: string;
+  credentialId: string;
+}): Promise<{ ok: true } | TrackerCredentialFailure> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('tracker_credentials')
+    .update({ revoked_at: new Date().toISOString() })
+    .eq('id', input.credentialId)
+    .eq('user_id', input.userId)
+    .is('revoked_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    console.error('Could not revoke tracker credential:', error.message);
+    return { ok: false, code: 'unavailable', message: 'Could not revoke the token. Try again.' };
+  }
+
+  if (!data) {
+    return { ok: false, code: 'not_found', message: 'That token is no longer active.' };
+  }
+
+  return { ok: true };
 }
 
 /** Stamped only after a delivery is accepted, so "last sync" means a sync. */

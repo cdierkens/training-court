@@ -8,14 +8,31 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GamePreferences } from '@/components/preferences/GamePreferences';
+import { TrackerSyncSection } from '@/components/preferences/TrackerSyncSection';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { usePreferredGames } from '@/hooks/useGameGuard';
+import { useUserData } from '@/hooks/user-data/useUserData';
+import type { TrackerCredentialSummary } from '@/lib/server/tracker-credentials';
 
-export function PreferencesPageClient({ avatarImages }: { avatarImages: string[] }) {
+interface PreferencesPageClientProps {
+  avatarImages: string[];
+  trackerCredentials: TrackerCredentialSummary[];
+  trackerSyncUnavailable: boolean;
+}
+
+export function PreferencesPageClient({
+  avatarImages,
+  trackerCredentials,
+  trackerSyncUnavailable,
+}: PreferencesPageClientProps) {
   const { user, loading } = useAuthGuard();
   const { preferredGames, loading: prefsLoading } = usePreferredGames();
+  const { data: clientUserData } = useUserData(user?.id);
 
   if (loading || !user || prefsLoading) return null;
+
+  // Client state so saving the screen name above unlocks the card in place.
+  const liveScreenName = clientUserData?.live_screen_name ?? null;
 
   return (
     <>
@@ -42,8 +59,14 @@ export function PreferencesPageClient({ avatarImages }: { avatarImages: string[]
             <Separator className='my-4' />
             <div className='flex justify-between items-center'>
               <Label>PTCG Live screen name</Label>
-              <ScreenNameEditable userId={user.id} />
+              <ScreenNameEditable userId={user.id} stayOnPage />
             </div>
+            <Separator className='my-4' />
+            <TrackerSyncSection
+              credentials={trackerCredentials}
+              liveScreenName={liveScreenName}
+              loadError={trackerSyncUnavailable}
+            />
             <Separator className='my-4' />
             <DeleteAccountSection />
           </div>
