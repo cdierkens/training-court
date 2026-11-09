@@ -129,6 +129,7 @@ export function battleLogListRecordToPreview(
   return {
     id: row.id,
     decklist_id: row.decklist_id,
+    decklist_text: row.decklist_text,
     format: row.format,
     language: 'en',
     players: [

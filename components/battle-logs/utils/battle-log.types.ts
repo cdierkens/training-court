@@ -33,6 +33,8 @@ export interface BattleLog {
   language: Language;
   id: string;
   decklist_id?: string | null;
+  /** Verbatim PTCGL decklist attached by a sync, when the tracker sent one. */
+  decklist_text?: string | null;
   format?: string | null;
   players: BattleLogPlayer[];
   // When the battle took place

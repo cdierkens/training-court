@@ -354,5 +354,9 @@
   "preferences.tracker.error.limitReached": "Du kannst höchstens {max} Token haben. Widerrufe zuerst eines.",
   "preferences.tracker.error.copyFailed": "Kopieren fehlgeschlagen. Markiere die Konfiguration und kopiere sie manuell.",
   "preferences.tracker.error.notFound": "Dieses Token ist nicht mehr aktiv.",
-  "preferences.tracker.error.unavailable": "Etwas ist schiefgelaufen. Versuche es erneut."
+  "preferences.tracker.error.unavailable": "Etwas ist schiefgelaufen. Versuche es erneut.",
+  "battleLogs.detail.decklist": "Deckliste",
+  "battleLogs.detail.importedFrom": "Importiert von {name}",
+  "battleLogs.edit.attachedDecklist": "Angehängte Deckliste",
+  "battleLogs.edit.attachedDecklistHint": "Vom Tracker gesendet. Leere das Feld, um die Liste zu entfernen; Deck und Sprites bleiben unverändert."
 }

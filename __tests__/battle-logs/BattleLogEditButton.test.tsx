@@ -15,6 +15,10 @@ jest.mock('../../components/ui/use-toast', () => ({
   useToast: () => ({ toast: jest.fn() }),
 }));
 
+jest.mock('gt-react', () => ({
+  T: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 jest.mock('recoil', () => ({
   atom: jest.fn((config) => config),
   useSetRecoilState: () => jest.fn(),
@@ -104,5 +108,81 @@ describe('BattleLogEditButton', () => {
         decklist_id: 'decklist-1',
       })
     );
+  });
+
+  it('edits an attached tracker decklist without touching the archetype', async () => {
+    render(
+      <BattleLogEditButton
+        isEditing
+        shouldDisable={false}
+        userId="user-1"
+        currentPlayer={{
+          name: 'Player',
+          deck: 'dragapult',
+          oppDeck: 'gardevoir',
+          result: 'W',
+        }}
+        log={{
+          id: 'log-1',
+          decklist_id: null,
+          decklist_text: '4 Dreepy TWM 128',
+          format: 'TEF-30C',
+          language: 'en',
+          players: [],
+          date: '2026-01-01T00:00:00.000Z',
+          winner: 'Player',
+          sections: [],
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getAllByRole('button')[0]);
+    fireEvent.change(screen.getByDisplayValue('4 Dreepy TWM 128'), {
+      target: { value: '4 Dreepy TWM 128\n4 Drakloak TWM 129' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        archetype: 'dragapult',
+        decklist_text: '4 Dreepy TWM 128\n4 Drakloak TWM 129',
+        decklist_id: null,
+      })
+    );
+  });
+
+  it('removes an emptied attached decklist', async () => {
+    render(
+      <BattleLogEditButton
+        isEditing
+        shouldDisable={false}
+        userId="user-1"
+        currentPlayer={{
+          name: 'Player',
+          deck: 'dragapult',
+          oppDeck: 'gardevoir',
+          result: 'W',
+        }}
+        log={{
+          id: 'log-1',
+          decklist_id: null,
+          decklist_text: '4 Dreepy TWM 128',
+          format: 'TEF-30C',
+          language: 'en',
+          players: [],
+          date: '2026-01-01T00:00:00.000Z',
+          winner: 'Player',
+          sections: [],
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getAllByRole('button')[0]);
+    fireEvent.change(screen.getByDisplayValue('4 Dreepy TWM 128'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ decklist_text: null }));
   });
 });

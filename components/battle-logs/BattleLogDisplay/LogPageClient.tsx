@@ -14,7 +14,7 @@ import { Notes } from '@/components/battle-logs/Notes/Notes';
 import { parseBattleLog } from '@/components/battle-logs/utils/battle-log.utils';
 import { BattleLogReplayViewer } from '@/components/battle-logs/Replay/BattleLogReplayViewer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { T } from 'gt-react';
+import { T, useGT } from 'gt-react';
 import { HISTORICAL_SWR_OPTIONS } from '@/lib/swr-options';
 
 type LogRow = Database['public']['Tables']['logs']['Row'];
@@ -35,6 +35,7 @@ export function LogPageClient({ logId, requireAuth = false, initialLog }: LogPag
   const authLoading = useRecoilValue(authLoadingAtom);
   const userData = useRecoilValue(userDataAtom);
   const router = useRouter();
+  const gt = useGT();
 
   const { data: logData, isLoading } = useSWR(
     ['log', logId],
@@ -62,6 +63,24 @@ export function LogPageClient({ logId, requireAuth = false, initialLog }: LogPag
     userData?.live_screen_name ?? null,
     logData.format
   ) : null, [logData, userData?.live_screen_name]);
+
+  // Provenance only: which token sent this. RLS hides other players'
+  // credentials, so a shared log simply omits the line.
+  const credentialId = logData?.source_credential_id ?? null;
+  const { data: credentialLabel } = useSWR(
+    credentialId ? ['tracker-credential-label', credentialId] : null,
+    async () => {
+      if (!credentialId) return null;
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('tracker_credentials')
+        .select('label')
+        .eq('id', credentialId)
+        .maybeSingle();
+      return data?.label ?? null;
+    },
+    HISTORICAL_SWR_OPTIONS
+  );
 
   useEffect(() => {
     if (requireAuth && !authLoading && !user) {
@@ -95,6 +114,11 @@ export function LogPageClient({ logId, requireAuth = false, initialLog }: LogPag
           <h3 className="text-[11px] text-muted-foreground">
             {formatDistanceToNowStrict(battleLog.date)} ago
           </h3>
+          {credentialLabel && (
+            <h3 className="text-[11px] text-muted-foreground">
+              {gt('Imported from {name}', { $id: 'battleLogs.detail.importedFrom', name: credentialLabel })}
+            </h3>
+          )}
         </div>
         {user && userData?.live_screen_name && (userData.live_screen_name === battleLog.players[0].name) && (
           <Notes logId={logData.id} serverLoadedNotes={logData.notes} />
@@ -108,6 +132,11 @@ export function LogPageClient({ logId, requireAuth = false, initialLog }: LogPag
               <TabsTrigger value="log">
                 <T id="battleLogs.replay.logView">Log</T>
               </TabsTrigger>
+              {logData.decklist_text && (
+                <TabsTrigger value="decklist">
+                  <T id="battleLogs.detail.decklist">Decklist</T>
+                </TabsTrigger>
+              )}
             </TabsList>
             <TabsContent value="replay">
               <BattleLogReplayViewer
@@ -118,6 +147,13 @@ export function LogPageClient({ logId, requireAuth = false, initialLog }: LogPag
             <TabsContent value="log">
               <BattleLogCarousel battleLog={battleLog} />
             </TabsContent>
+            {logData.decklist_text && (
+              <TabsContent value="decklist">
+                <pre className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-xs">
+                  {logData.decklist_text}
+                </pre>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>
