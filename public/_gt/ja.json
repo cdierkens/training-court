@@ -354,5 +354,9 @@
   "preferences.tracker.error.limitReached": "トークンは最大{max}個です。先に1つを無効化してください。",
   "preferences.tracker.error.copyFailed": "コピーできませんでした。設定を選択して手動でコピーしてください。",
   "preferences.tracker.error.notFound": "このトークンはすでに有効ではありません。",
-  "preferences.tracker.error.unavailable": "問題が発生しました。もう一度お試しください。"
+  "preferences.tracker.error.unavailable": "問題が発生しました。もう一度お試しください。",
+  "battleLogs.detail.decklist": "デッキリスト",
+  "battleLogs.detail.importedFrom": "{name} からインポート",
+  "battleLogs.edit.attachedDecklist": "添付されたデッキリスト",
+  "battleLogs.edit.attachedDecklistHint": "トラッカーから送信されました。空にするとリストを削除します。デッキとスプライトはそのままです。"
 }

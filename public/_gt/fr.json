@@ -354,5 +354,9 @@
   "preferences.tracker.error.limitReached": "Vous pouvez avoir au maximum {max} jetons. Révoquez-en un d'abord.",
   "preferences.tracker.error.copyFailed": "Impossible de copier. Sélectionnez la configuration et copiez-la manuellement.",
   "preferences.tracker.error.notFound": "Ce jeton n'est plus actif.",
-  "preferences.tracker.error.unavailable": "Une erreur est survenue. Réessayez."
+  "preferences.tracker.error.unavailable": "Une erreur est survenue. Réessayez.",
+  "battleLogs.detail.decklist": "Liste de deck",
+  "battleLogs.detail.importedFrom": "Importé depuis {name}",
+  "battleLogs.edit.attachedDecklist": "Liste jointe",
+  "battleLogs.edit.attachedDecklistHint": "Envoyée par le tracker. Videz le champ pour retirer la liste ; votre deck et vos sprites ne changent pas."
 }

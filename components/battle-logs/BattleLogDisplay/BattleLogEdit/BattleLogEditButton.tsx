@@ -23,6 +23,8 @@ import { LogFormats, logFormats } from "@/components/tournaments/Format/tourname
 import { useSetRecoilState } from "recoil";
 import { battleLogsAtom } from "@/app/recoil/atoms/battle-logs";
 import { DecklistSelect } from "@/components/ptcg/deckbuilder/DecklistSelect";
+import { Textarea } from "@/components/ui/textarea";
+import { T } from "gt-react";
 
 interface BattleLogEditButtonProps {
   isEditing: boolean;
@@ -36,6 +38,7 @@ export const BattleLogEditButton = (props: BattleLogEditButtonProps) => {
   const [newArchetype, setNewArchetype] = useState('');
   const [newOppArchetype, setNewOppArchetype] = useState('');
   const [newDecklistId, setNewDecklistId] = useState<string | null>(null);
+  const [newDecklistText, setNewDecklistText] = useState('');
   const [newFormat, setNewFormat] = useState<LogFormats | undefined>(undefined);
   const { toast } = useToast();
   const setBattleLogs = useSetRecoilState(battleLogsAtom);
@@ -44,15 +47,20 @@ export const BattleLogEditButton = (props: BattleLogEditButtonProps) => {
     setNewArchetype(props.currentPlayer.deck || '');
     setNewOppArchetype(props.currentPlayer.oppDeck || '');
     setNewDecklistId(props.log.decklist_id ?? null);
+    setNewDecklistText(props.log.decklist_text ?? '');
     setNewFormat((props.log.format as LogFormats | null) ?? undefined);
-  }, [props.currentPlayer.deck, props.currentPlayer.oppDeck, props.log.decklist_id, props.log.format]);
+  }, [props.currentPlayer.deck, props.currentPlayer.oppDeck, props.log.decklist_id, props.log.decklist_text, props.log.format]);
   
   const handleEditLog = useCallback(async () => {
     const supabase = createClient();
+    // An emptied attached list is removed, not stored as whitespace. The deck
+    // library picker and the archetype are untouched either way.
+    const decklistText = newDecklistText.trim().length > 0 ? newDecklistText : null;
     const { error } = await supabase.from('logs').update({
       archetype: newArchetype,
       opp_archetype: newOppArchetype,
       decklist_id: newDecklistId,
+      decklist_text: decklistText,
       format: newFormat ?? props.log.format ?? ''
     }).eq('id', props.log.id);
 
@@ -71,6 +79,7 @@ export const BattleLogEditButton = (props: BattleLogEditButtonProps) => {
                 archetype: newArchetype,
                 opp_archetype: newOppArchetype,
                 decklist_id: newDecklistId,
+                decklist_text: decklistText,
                 format: newFormat ?? row.format,
               }
             : row
@@ -80,7 +89,7 @@ export const BattleLogEditButton = (props: BattleLogEditButtonProps) => {
         title: "Log updated",
       });
     }
-  }, [toast, newArchetype, newOppArchetype, newDecklistId, newFormat, props.log.format, props.log.id, setBattleLogs]);
+  }, [toast, newArchetype, newOppArchetype, newDecklistId, newDecklistText, newFormat, props.log.format, props.log.id, setBattleLogs]);
 
   return (
     <Dialog>
@@ -109,6 +118,25 @@ export const BattleLogEditButton = (props: BattleLogEditButtonProps) => {
               setNewDecklistId(decklist?.id ?? null);
             }}
           />
+
+          {props.log.decklist_text != null && props.log.decklist_text !== '' && (
+            <>
+              <Label>
+                <T id="battleLogs.edit.attachedDecklist">Attached decklist</T>
+              </Label>
+              <Textarea
+                rows={6}
+                className="font-mono text-xs"
+                value={newDecklistText}
+                onChange={(event) => setNewDecklistText(event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                <T id="battleLogs.edit.attachedDecklistHint">
+                  Sent by the tracker. Empty it to remove the list; your deck and sprites stay as they are.
+                </T>
+              </p>
+            </>
+          )}
 
           <Label>Opponent's deck</Label>
           <AddArchetype archetype={newOppArchetype} setArchetype={setNewOppArchetype} />

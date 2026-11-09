@@ -354,5 +354,9 @@
   "preferences.tracker.error.limitReached": "Puedes tener como máximo {max} tokens. Revoca uno primero.",
   "preferences.tracker.error.copyFailed": "No se pudo copiar. Selecciona la configuración y cópiala manualmente.",
   "preferences.tracker.error.notFound": "Ese token ya no está activo.",
-  "preferences.tracker.error.unavailable": "Algo salió mal. Inténtalo de nuevo."
+  "preferences.tracker.error.unavailable": "Algo salió mal. Inténtalo de nuevo.",
+  "battleLogs.detail.decklist": "Lista de mazo",
+  "battleLogs.detail.importedFrom": "Importado desde {name}",
+  "battleLogs.edit.attachedDecklist": "Lista adjunta",
+  "battleLogs.edit.attachedDecklistHint": "Enviada por el tracker. Vacíala para quitar la lista; tu mazo y tus sprites no cambian."
 }
